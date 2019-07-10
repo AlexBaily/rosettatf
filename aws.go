@@ -1,5 +1,13 @@
 package main
 
+import (
+    "github.com/aws/aws-sdk-go/aws"
+    "github.com/aws/aws-sdk-go/aws/session"
+    "github.com/aws/aws-sdk-go/service/ec2"
+    "github.com/aws/aws-sdk-go/aws/awserr"
+    "fmt"
+)
+
 type volume struct {
 
 }
@@ -12,3 +20,33 @@ type instance struct {
 
 }
 
+var sess *session.Session
+
+func init() {
+    sess = session.Must(session.NewSession(&aws.Config{
+        Region: aws.String("eu-west-1")}))
+}
+
+func queryEc2(instanceId string) (string) {
+    svc := ec2.New(sess)
+    input := &ec2.DescribeInstancesInput{
+        InstanceIds: []*string{
+            aws.String(instanceId),
+        },
+    }
+    result, err := svc.DescribeInstances(input)
+    if err != nil {
+        if aerr, ok := err.(awserr.Error); ok {
+            switch aerr.Code() {
+            default:
+                fmt.Println(aerr.Error())
+            }
+        } else {
+            // Print the error, cast err to awserr.Error to get the Code and
+            // Message from an error.
+            fmt.Println(err.Error())
+        }
+    }
+    instance := result.Reservations[0].Instances
+    return instance[0].GoString()
+}

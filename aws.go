@@ -7,6 +7,7 @@ import (
     "github.com/aws/aws-sdk-go/aws/awserr"
     "fmt"
     "strconv"
+    "reflect"
 )
 
 //EBS Volume struc for captring
@@ -25,8 +26,13 @@ type instance struct {
 
 //String function to convert the instance Struct to a terraform string
 func (inst instance) String() string {
+    r := reflect.ValueOf(inst)
     s := fmt.Sprintf("resource \"aws_instance\" \"test\" {\n")
-    s += fmt.Sprintf("    ami = \"%s\"\n", inst.ami)
+    for i := 0; i < r.Type().NumField(); i++ {
+        if r.Field(i).String() != "" {
+            s += fmt.Sprintf("    %s = \"%s\"\n", r.Type().Field(i).Name, r.Field(i))
+        }
+    }
     s += "}"
     return s
 }
@@ -65,6 +71,7 @@ func queryEc2(instanceId string) (string) {
     //In this case we are only looking at the first reservation and instance in that reservation.
     r := result.Reservations[0].Instances[0]
     //Create the instance struct based on the information from the EC2 instance.
+    //Need to deference the attributes.
     instanceStruct := instance{
         ami: *r.ImageId,
         ebs_optimized: strconv.FormatBool(*r.EbsOptimized),

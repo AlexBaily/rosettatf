@@ -49,12 +49,33 @@ func init() {
 //Query EC2 for the information about the instance ID and return the instance String.
 func queryEc2(instanceId string) (string) {
     svc := ec2.New(sess)
+    //Set config for getting instance information
     input := &ec2.DescribeInstancesInput{
         InstanceIds: []*string{
             aws.String(instanceId),
         },
     }
+    //get instance information and deal with errors.
     result, err := svc.DescribeInstances(input)
+    if err != nil {
+        if aerr, ok := err.(awserr.Error); ok {
+            switch aerr.Code() {
+            default:
+                fmt.Println(aerr.Error())
+            }
+        } else {
+            // Print the error, cast err to awserr.Error to get the Code and
+            // Message from an error.
+            fmt.Println(err.Error())
+        }
+    }
+    //These two blocks are due to the fact that you cannot get api termination via normal describe
+    attrInput := &ec2.DescribeInstanceAttributeInput{
+        Attribute:  aws.String("disableApiTermination"),
+        InstanceId: aws.String(instanceId),
+    }
+    //Get the attribute input
+    attrResult, err := svc.DescribeInstanceAttribute(attrInput)
     if err != nil {
         if aerr, ok := err.(awserr.Error); ok {
             switch aerr.Code() {
@@ -70,11 +91,15 @@ func queryEc2(instanceId string) (string) {
     //EC2 Instane are returned as reservations which can have multiple EC2 instances;
     //In this case we are only looking at the first reservation and instance in that reservation.
     r := result.Reservations[0].Instances[0]
+    //Get the boolean value of disable API termination.
+    attrR := attrResult.DisableApiTermination.Value
     //Create the instance struct based on the information from the EC2 instance.
     //Need to deference the attributes.
     instanceStruct := instance{
         ami: *r.ImageId,
         ebs_optimized: strconv.FormatBool(*r.EbsOptimized),
+        disable_api_termination: strconv.FormatBool(*attrR),
+        subnet_id: *r.SubnetId,
     }
 
     return instanceStruct.String()

@@ -100,6 +100,9 @@ func queryEc2(instanceId string) (string) {
         ebs_optimized: strconv.FormatBool(*r.EbsOptimized),
         disable_api_termination: strconv.FormatBool(*attrR),
         subnet_id: *r.SubnetId,
+        instance_type: *r.InstanceType,
+        key_name: *r.KeyName,
+        private_ip: *r.PrivateIpAddress,
     }
 
     return instanceStruct.String()

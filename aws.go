@@ -8,6 +8,7 @@ import (
     "fmt"
     "strconv"
     "reflect"
+    "strings"
 )
 
 //EBS Volume struc for captring
@@ -24,13 +25,21 @@ type instance struct {
 
 }
 
+//Create a list of the optional EC2 Values.
+var (
+    ec2Optional = [4]string{"iam_instance_profile", "vpc_security_groups_ids",
+        "tags", "ebs_block_device"}
+)
+
 //String function to convert the instance Struct to a terraform string
 func (inst instance) String() string {
     r := reflect.ValueOf(inst)
     s := fmt.Sprintf("resource \"aws_instance\" \"test\" {\n")
     for i := 0; i < r.Type().NumField(); i++ {
-        if r.Field(i).String() != "" {
+        if r.Field(i).String() != "" &&  r.Field(i).Type().Kind() != reflect.Slice {
             s += fmt.Sprintf("    %s = \"%s\"\n", r.Type().Field(i).Name, r.Field(i))
+        } else if r.Field(i).Type().Kind() == reflect.Slice {
+            fmt.Println("Slice found")
         }
     }
     s += "}"
@@ -104,6 +113,24 @@ func queryEc2(instanceId string) (string) {
         key_name: *r.KeyName,
         private_ip: *r.PrivateIpAddress,
     }
+
+    //Get a reflection of the AWS SDK instance so we can check the fields
+    //Here we can check for optional values such as IAM instance profile or SGs
+    rInst := reflect.ValueOf(*r)
+
+    //Relect Value.Type() interface 'FieldByName' will return a StructField and a boolean
+    //The boolean will determine whether the field is found.
+    _, iamProfileBool := rInst.Type().FieldByName("IamInstanceProfile")
+    if iamProfileBool {
+        profileName := strings.Split(*r.IamInstanceProfile.Arn, "/")
+        instanceStruct.iam_instance_profile = profileName[1]
+    }
+    //Creating the string slice to house the SG array
+    sgArray := make([]string, len(r.SecurityGroups))
+    for i := 0; i < len(r.SecurityGroups); i++ {
+        sgArray[i] = *r.SecurityGroups[i].GroupId
+    }
+    instanceStruct.vpc_security_group_ids = sgArray
 
     return instanceStruct.String()
 }
